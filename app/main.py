@@ -2,17 +2,31 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
-from app.core.rate_limit import limiter
-from app.api.routes import auth, users, matching, chat, moderation
 
-app = FastAPI(title="Cheers API", version="1.0.0", docs_url="/docs")
+from app.api.routes import auth, chat, matching, moderation, users
+from app.core.config import settings
+from app.core.rate_limit import limiter
+
+# Expose Swagger UI only outside production so secrets never leak via docs.
+_dev = settings.ENVIRONMENT.lower() != "production"
+app = FastAPI(
+    title="Cheers API",
+    version="1.0.0",
+    docs_url="/docs" if _dev else None,
+    redoc_url="/redoc" if _dev else None,
+    openapi_url="/openapi.json" if _dev else None,
+)
 
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
+_origins = ["https://frontend-wibantexxs-projects.vercel.app"]
+if _dev:
+    _origins.append("http://localhost:3000")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://cheers.vercel.app"],
+    allow_origins=_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
