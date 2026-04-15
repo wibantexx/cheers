@@ -1,10 +1,18 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.db.session import get_db
+
 from app.api.deps import get_current_user
+from app.db.session import get_db
 from app.models.user import User
+from app.schemas.matching import MatchOut
 from app.schemas.user import UserPublic
-from app.services.matching_service import get_candidates, like_user, get_matches
+from app.services.matching_service import (
+    get_candidates,
+    get_matches,
+    like_user,
+    pass_user,
+    unmatch,
+)
 
 router = APIRouter(prefix="/matching", tags=["matching"])
 
@@ -27,23 +35,27 @@ async def like(
 
 
 @router.post("/pass/{user_id}")
-async def pass_user(
+async def pass_(
     user_id: str,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    like = __import__("app.models.match", fromlist=["Like"]).Like
-    from sqlalchemy import and_
-    from app.models.match import Like
-    skip = Like(from_user_id=current_user.id, to_user_id=user_id)
-    db.add(skip)
-    await db.commit()
-    return {"passed": True}
+    return await pass_user(current_user.id, user_id, db)
 
 
-@router.get("/matches")
+@router.get("/matches", response_model=list[MatchOut])
 async def matches(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     return await get_matches(current_user.id, db)
+
+
+@router.delete("/matches/{match_id}")
+async def unmatch_route(
+    match_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    await unmatch(match_id, current_user.id, db)
+    return {"unmatched": True}

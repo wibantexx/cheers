@@ -1,6 +1,8 @@
 import cloudinary
 import cloudinary.uploader
-from fastapi import UploadFile, HTTPException, status
+from fastapi import HTTPException, UploadFile, status
+from starlette.concurrency import run_in_threadpool
+
 from app.core.config import settings
 
 cloudinary.config(
@@ -22,7 +24,9 @@ async def upload_avatar(file: UploadFile, user_id: str) -> str:
     if len(contents) > MAX_SIZE:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="File too large (max 5MB)")
 
-    result = cloudinary.uploader.upload(
+    # cloudinary-python is sync/blocking — offload so the event loop stays free.
+    result = await run_in_threadpool(
+        cloudinary.uploader.upload,
         contents,
         public_id=f"avatars/{user_id}",
         overwrite=True,
